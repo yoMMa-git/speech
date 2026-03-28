@@ -27,7 +27,7 @@ class AudioFilterProcessor:
             data = data.astype(np.float32) / 2147483647.0
         return fs, data.astype(np.float32)
     
-    # ==================== КИХ-ФИЛЬТРЫ ====================
+    # КИХ-ФИЛЬТРЫ
     
     def _create_fir(self, ftype: Literal['lowpass', 'highpass', 'bandpass'], 
                     cutoff, numtaps: int = 101) -> Tuple[np.ndarray, np.ndarray]:
@@ -36,7 +36,7 @@ class AudioFilterProcessor:
         b = firwin(numtaps, Wn, window='hamming', pass_zero=ftype)
         return b, np.array([1.0])
     
-    # ==================== ВЕЙВЛЕТ ====================
+    # ВЕЙВЛЕТ
     
     def _wavelet(self, data: np.ndarray, wavelet: str = 'db4', 
                          level: int = 5, threshold: Optional[float] = None) -> np.ndarray:
@@ -65,7 +65,7 @@ class AudioFilterProcessor:
         plt.tight_layout()
         plt.savefig(save_path, dpi=150, bbox_inches='tight'); plt.close()
     
-    # ==================== ГРАФИКИ ====================
+    # Построение графиков
     
     def _plot_comparison(self, orig: np.ndarray, filt: np.ndarray, save_path: str):
         max_s = min(len(orig), self.fs * 3)
@@ -90,14 +90,25 @@ class AudioFilterProcessor:
         plt.tight_layout(); plt.savefig(save_path, dpi=150); plt.close()
     
     def _plot_freq_response(self, orig: np.ndarray, filt: np.ndarray, save_path: str):
-        f1, p1 = welch(orig, self.fs, nperseg=4096)
-        f2, p2 = welch(filt, self.fs, nperseg=4096)
+        orig_1d = orig[:, 0] if orig.ndim == 2 else orig
+        filt_1d = filt[:, 0] if filt.ndim == 2 else filt
+
+        nperseg_orig = min(4096, len(orig_1d))
+        nperseg_filt = min(4096, len(filt_1d))
+
+        f1, p1 = welch(orig_1d, self.fs, nperseg=nperseg_orig)
+        f2, p2 = welch(filt_1d, self.fs, nperseg=nperseg_filt)
+
         plt.figure(figsize=(10, 4))
         plt.semilogx(f1, 10 * np.log10(p1 + 1e-10), label='До', alpha=0.7)
         plt.semilogx(f2, 10 * np.log10(p2 + 1e-10), label='После', alpha=0.7)
-        plt.xlabel('Гц'); plt.ylabel('дБ/Гц'); plt.title('АЧХ Сигнала')
-        plt.legend(); plt.grid(True, which='both')
-        plt.savefig(save_path, dpi=150); plt.close()
+        plt.xlabel('Гц')
+        plt.ylabel('дБ/Гц')
+        plt.title('АЧХ сигнала')
+        plt.legend()
+        plt.grid(True, which='both')
+        plt.savefig(save_path, dpi=150)
+        plt.close()
     
     def _plot_filter_response(self, b: np.ndarray, a: np.ndarray, save_path: str):
         w, h = freqz(b, a, worN=2000, fs=self.fs)
@@ -107,7 +118,7 @@ class AudioFilterProcessor:
         plt.grid(True, which='both'); plt.ylim(-100, 5)
         plt.savefig(save_path, dpi=150); plt.close()
     
-    # ==================== ПРИМЕНЕНИЕ ФИЛЬТРОВ ====================
+    # Применение фильтров
     
     def apply_fir(self, ftype: Literal['lowpass', 'highpass', 'bandpass'], 
                   cutoff, numtaps: int = 101, output_dir: str = "./output") -> np.ndarray:
@@ -122,7 +133,7 @@ class AudioFilterProcessor:
         if len(self.current_data.shape) == 2:
             filtered = np.zeros_like(self.current_data)
             for ch in range(self.current_data.shape[1]):
-                filtered[:, ch], _ = lfilter(b, a, self.current_data[:, ch])
+                filtered[:, ch] = lfilter(b, a, self.current_data[:, ch])
         else:
             filtered = lfilter(b, a, self.current_data)
         
@@ -166,7 +177,7 @@ class AudioFilterProcessor:
         print(f"Применено, графики в: {output_dir}")
         return filtered
     
-    # ==================== СОХРАНЕНИЕ ====================
+    # Сохранение
     
     def save_result(self, output_file: str, target_dbfs: float = -12):
         peak = np.max(np.abs(self.current_data)) or 1e-10
@@ -203,16 +214,17 @@ class AudioFilterProcessor:
         return self.apply_wavelet(**kwargs)
 
 
-# ==================== ПРИМЕР ИСПОЛЬЗОВАНИЯ ====================
+# Пример использования
 
 if __name__ == "__main__":
-    proc = AudioFilterProcessor("pink_noise/fft.wav")
+    proc = AudioFilterProcessor("filter_results/speech/Tim Urban_ Inside the mind of a master procrastinator TED.wav")
     
     # proc.bandpass(low=2000, high=8000, numtaps=101)
 
-    proc.wavelet(wavelet='db1', level=5)
+    proc.lowpass(cutoff=7000)
 
-    proc.highpass(cutoff=5000, numtaps=101)
+    proc.wavelet(wavelet='db2', level=2)
+    
     
     # История и сохранение
     proc.summary()
